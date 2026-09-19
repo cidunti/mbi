@@ -76,7 +76,7 @@ InfoCorner.CornerRadius = UDim.new(0, 6)
 InfoCorner.Parent = Info
 
 local Text = Instance.new("TextLabel")
-Text.Size = UDim2.new(1, -15, 0, 500)
+Text.Size = UDim2.new(1, -15, 0, 600)
 Text.Position = UDim2.fromOffset(7, 5)
 Text.BackgroundTransparency = 1
 Text.TextColor3 = Color3.fromRGB(235, 235, 235)
@@ -85,7 +85,8 @@ Text.TextSize = 13
 Text.TextXAlignment = Enum.TextXAlignment.Left
 Text.TextYAlignment = Enum.TextYAlignment.Top
 Text.TextWrapped = false
-Text.Text = "Clique em INSPEÇÃO e depois clique diretamente no botão que deseja analisar."
+Text.Text =
+    "Ative a inspeção e toque diretamente no botão que deseja analisar."
 Text.Parent = Info
 
 --------------------------------------------------
@@ -130,117 +131,6 @@ local function getImageId(obj)
     return nil
 end
 
-local function buildInfo(objects, clickX, clickY)
-
-    local output = {}
-
-    table.insert(output, "========== CLIQUE ==========")
-    table.insert(output, "X: " .. math.floor(clickX))
-    table.insert(output, "Y: " .. math.floor(clickY))
-    table.insert(output, "")
-    table.insert(output, "Objetos encontrados: " .. tostring(#objects))
-    table.insert(output, "")
-
-    for index, obj in ipairs(objects) do
-
-        if obj
-            and obj:IsA("GuiObject")
-            and obj:IsDescendantOf(PlayerGui)
-            and not obj:IsDescendantOf(ScreenGui) then
-
-            table.insert(output, "============================")
-            table.insert(output, "OBJETO #" .. tostring(index))
-            table.insert(output, "============================")
-
-            table.insert(output, "Nome: " .. obj.Name)
-            table.insert(output, "Classe: " .. obj.ClassName)
-            table.insert(output, "Caminho:")
-            table.insert(output, obj:GetFullName())
-            table.insert(output, "")
-
-            table.insert(output, "Posição:")
-            table.insert(
-                output,
-                "X=" .. math.floor(obj.AbsolutePosition.X)
-                .. " | Y=" .. math.floor(obj.AbsolutePosition.Y)
-            )
-
-            table.insert(output, "Tamanho:")
-            table.insert(
-                output,
-                "W=" .. math.floor(obj.AbsoluteSize.X)
-                .. " | H=" .. math.floor(obj.AbsoluteSize.Y)
-            )
-
-            table.insert(output, "")
-            table.insert(output, "Visible: " .. tostring(obj.Visible))
-            table.insert(output, "ZIndex: " .. tostring(obj.ZIndex))
-
-            if obj.Parent then
-                table.insert(output, "")
-                table.insert(output, "Pai:")
-                table.insert(output, obj.Parent:GetFullName())
-            end
-
-            local imageId = getImageId(obj)
-
-            if imageId then
-                table.insert(output, "")
-                table.insert(output, "IMAGE / ASSET ID:")
-                table.insert(output, tostring(imageId))
-            end
-
-            if obj:IsA("TextButton") then
-                table.insert(output, "")
-                table.insert(output, "Texto:")
-                table.insert(output, tostring(obj.Text))
-            end
-
-            if obj:IsA("GuiButton") then
-                table.insert(output, "")
-                table.insert(output, "É botão: SIM")
-                table.insert(output, "Active: " .. tostring(obj.Active))
-                table.insert(
-                    output,
-                    "AutoButtonColor: "
-                    .. tostring(obj.AutoButtonColor)
-                )
-            end
-
-            -- Hierarquia acima do objeto
-            table.insert(output, "")
-            table.insert(output, "HIERARQUIA:")
-
-            local current = obj
-            local level = 0
-
-            while current and current ~= PlayerGui and level < 15 do
-
-                table.insert(
-                    output,
-                    string.rep("  ", level)
-                    .. "└─ "
-                    .. current.Name
-                    .. " ["
-                    .. current.ClassName
-                    .. "]"
-                )
-
-                current = current.Parent
-                level += 1
-            end
-
-            table.insert(output, "")
-        end
-    end
-
-    return table.concat(output, "\n")
-end
-
---------------------------------------------------
--- PROCURA OBJETOS NO PONTO CLICADO
---------------------------------------------------
-
 local function getObjectsAtPoint(x, y)
 
     local found = {}
@@ -268,28 +158,23 @@ local function getObjectsAtPoint(x, y)
         end
     end
 
-    -- Coordenada normal
+    -- Coordenada original
     pcall(function()
-        addObjects(
-            PlayerGui:GetGuiObjectsAtPosition(x, y)
-        )
+        addObjects(PlayerGui:GetGuiObjectsAtPosition(x, y))
     end)
 
-    -- Alternativa pelo GuiService
     pcall(function()
-        addObjects(
-            GuiService:GetGuiObjectsAtPosition(x, y)
-        )
+        addObjects(GuiService:GetGuiObjectsAtPosition(x, y))
     end)
 
-    -- Tenta compensar o GuiInset
-    local insetTopLeft = GuiService:GetGuiInset()
+    -- Compensação do inset
+    local inset = GuiService:GetGuiInset()
 
     pcall(function()
         addObjects(
             PlayerGui:GetGuiObjectsAtPosition(
-                x - insetTopLeft.X,
-                y - insetTopLeft.Y
+                x - inset.X,
+                y - inset.Y
             )
         )
     end)
@@ -297,28 +182,29 @@ local function getObjectsAtPoint(x, y)
     pcall(function()
         addObjects(
             PlayerGui:GetGuiObjectsAtPosition(
-                x + insetTopLeft.X,
-                y + insetTopLeft.Y
+                x + inset.X,
+                y + inset.Y
             )
         )
     end)
 
-    -- Coloca objetos mais "profundos" primeiro
+    -- Mais profundo primeiro
     table.sort(found, function(a, b)
+
         local depthA = 0
         local depthB = 0
 
-        local ca = a
-        local cb = b
+        local currentA = a
+        local currentB = b
 
-        while ca and ca ~= PlayerGui do
+        while currentA and currentA ~= PlayerGui do
             depthA += 1
-            ca = ca.Parent
+            currentA = currentA.Parent
         end
 
-        while cb and cb ~= PlayerGui do
+        while currentB and currentB ~= PlayerGui do
             depthB += 1
-            cb = cb.Parent
+            currentB = currentB.Parent
         end
 
         return depthA > depthB
@@ -327,11 +213,120 @@ local function getObjectsAtPoint(x, y)
     return found
 end
 
+local function inspectObjects(objects, x, y)
+
+    local output = {}
+
+    table.insert(output, "========== CLIQUE ==========")
+    table.insert(output, "X: " .. math.floor(x))
+    table.insert(output, "Y: " .. math.floor(y))
+    table.insert(output, "")
+    table.insert(output, "Objetos encontrados: " .. #objects)
+    table.insert(output, "")
+
+    for index, obj in ipairs(objects) do
+
+        table.insert(output, "============================")
+        table.insert(output, "OBJETO #" .. index)
+        table.insert(output, "============================")
+
+        table.insert(output, "Nome: " .. obj.Name)
+        table.insert(output, "Classe: " .. obj.ClassName)
+        table.insert(output, "")
+        table.insert(output, "CAMINHO COMPLETO:")
+        table.insert(output, obj:GetFullName())
+        table.insert(output, "")
+
+        table.insert(output, "POSIÇÃO:")
+        table.insert(
+            output,
+            "X = " .. math.floor(obj.AbsolutePosition.X)
+            .. " | Y = " .. math.floor(obj.AbsolutePosition.Y)
+        )
+
+        table.insert(output, "TAMANHO:")
+        table.insert(
+            output,
+            "W = " .. math.floor(obj.AbsoluteSize.X)
+            .. " | H = " .. math.floor(obj.AbsoluteSize.Y)
+        )
+
+        table.insert(output, "")
+        table.insert(output, "Visible: " .. tostring(obj.Visible))
+        table.insert(output, "ZIndex: " .. tostring(obj.ZIndex))
+
+        if obj.Parent then
+            table.insert(output, "")
+            table.insert(output, "PAI:")
+            table.insert(output, obj.Parent:GetFullName())
+        end
+
+        if obj:IsA("GuiButton") then
+            table.insert(output, "")
+            table.insert(output, "É BOTÃO: SIM")
+            table.insert(output, "Active: " .. tostring(obj.Active))
+            table.insert(
+                output,
+                "AutoButtonColor: "
+                .. tostring(obj.AutoButtonColor)
+            )
+        end
+
+        if obj:IsA("TextButton") then
+            table.insert(output, "")
+            table.insert(output, "TEXTO:")
+            table.insert(output, tostring(obj.Text))
+        end
+
+        local imageId = getImageId(obj)
+
+        if imageId then
+            table.insert(output, "")
+            table.insert(output, "IMAGE / ASSET ID:")
+            table.insert(output, tostring(imageId))
+        end
+
+        table.insert(output, "")
+        table.insert(output, "HIERARQUIA:")
+
+        local current = obj
+        local level = 0
+
+        while current and current ~= PlayerGui and level < 20 do
+
+            table.insert(
+                output,
+                string.rep("  ", level)
+                .. "└─ "
+                .. current.Name
+                .. " ["
+                .. current.ClassName
+                .. "]"
+            )
+
+            current = current.Parent
+            level += 1
+        end
+
+        table.insert(output, "")
+    end
+
+    local result = table.concat(output, "\n")
+
+    Text.Text = result
+
+    if objects[1] then
+        safeClipboard(objects[1]:GetFullName())
+    end
+
+    print(result)
+end
+
 --------------------------------------------------
--- BOTÃO DE INSPEÇÃO
+-- ATIVAR / DESATIVAR
 --------------------------------------------------
 
-Toggle.MouseButton1Click:Connect(function()
+Toggle.Activated:Connect(function()
 
     Inspecting = not Inspecting
 
@@ -342,8 +337,7 @@ Toggle.MouseButton1Click:Connect(function()
 
         Text.Text =
             "INSPEÇÃO ATIVADA\n\n"
-            .. "Clique diretamente no botão/elemento que deseja analisar.\n\n"
-            .. "O resultado aparecerá aqui."
+            .. "Toque no botão que você quer analisar."
 
     else
 
@@ -355,25 +349,37 @@ Toggle.MouseButton1Click:Connect(function()
 end)
 
 --------------------------------------------------
--- CLIQUE NA TELA
+-- MOUSE + TOUCH
 --------------------------------------------------
 
-UserInputService.InputBegan:Connect(function(input)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
     if not Inspecting then
         return
     end
 
-    if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+    local x
+    local y
+
+    -- PC
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+
+        local position = UserInputService:GetMouseLocation()
+
+        x = position.X
+        y = position.Y
+
+    -- MOBILE
+    elseif input.UserInputType == Enum.UserInputType.Touch then
+
+        x = input.Position.X
+        y = input.Position.Y
+
+    else
         return
     end
 
-    local mousePosition = UserInputService:GetMouseLocation()
-
-    local x = mousePosition.X
-    local y = mousePosition.Y
-
-    -- Não inspeciona o próprio menu
+    -- Ignora o menu do inspector
     if isInsideInspector(x, y) then
         return
     end
@@ -384,46 +390,32 @@ UserInputService.InputBegan:Connect(function(input)
 
         Text.Text =
             "NENHUM OBJETO ENCONTRADO\n\n"
-            .. "Coordenadas:\n"
             .. "X = " .. math.floor(x) .. "\n"
             .. "Y = " .. math.floor(y)
 
         return
     end
 
-    local result = buildInfo(objects, x, y)
+    inspectObjects(objects, x, y)
 
-    Text.Text = result
-
-    -- Copia o caminho do primeiro objeto encontrado
-    local first = objects[1]
-
-    if first then
-        safeClipboard(first:GetFullName())
-    end
-
-    print(result)
+    -- Desativa depois de selecionar
+    Inspecting = false
+    Toggle.Text = "INSPEÇÃO: OFF"
+    Toggle.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 end)
 
 --------------------------------------------------
--- ATUALIZA SCROLL
+-- SCROLL
 --------------------------------------------------
-
-Text:GetPropertyChangedSignal("TextBounds"):Connect(function()
-
-    Info.CanvasSize = UDim2.fromOffset(
-        0,
-        Text.TextBounds.Y + 15
-    )
-end)
 
 task.spawn(function()
     while ScreenGui.Parent do
-        task.wait(0.2)
+
+        task.wait(0.15)
 
         Info.CanvasSize = UDim2.fromOffset(
             0,
-            Text.TextBounds.Y + 15
+            Text.TextBounds.Y + 20
         )
     end
 end)
